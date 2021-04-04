@@ -4,6 +4,10 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.json.JsonObjectDecoder;
+import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.codec.string.StringEncoder;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
@@ -30,7 +34,32 @@ public class TransferListener implements AutoCloseable {
                 .childHandler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel ch) {
-                        ch.pipeline();
+                        //new LengthFieldBasedFrameDecoder(64*1024, 0, 2)
+                        ch.pipeline().addLast(new JsonObjectDecoder(), new StringEncoder(), new StringDecoder(),
+                                new SimpleChannelInboundHandler<String>() {
+                                    private final Logger logger = LogManager.getLogger(this.getClass());
+                                    @Override
+                                    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+                                        logger.info("New active channel");
+                                    }
+
+                                    @Override
+                                    protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
+                                        logger.info(msg);
+                                        ctx.channel().writeAndFlush("{\"re\": true, \"origin\": " + msg + "}");
+                                    }
+
+                                    @Override
+                                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                        logger.error(cause);
+                                        ctx.close();
+                                    }
+
+                                    @Override
+                                    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                        logger.info("client disconnect");
+                                    }
+                                });
                     }
                 });
     }
